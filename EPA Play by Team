@@ -1,0 +1,64 @@
+import pandas as pd
+import numpy as np
+import os
+
+pd.options.mode.chained_assignment = None
+pd.set_option('display.max_rows', 500)
+pd.set_option('display.max_columns', 300)
+
+NFL2019 = pd.read_csv('/Users/Firefly/Desktop/iMac_Drive/Joseph/Coding/NFL/Jupyter/play_by_play_2019.csv')
+
+import os
+import urllib.request
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+
+#urls = pd.read_csv('https://raw.githubusercontent.com/statsbylopez/BlogPosts/master/nfl_teamlogos.csv')
+my_path = '/Users/Firefly/Desktop/iMac_Drive/Joseph/Coding/NFL/Jupyter'
+#for i in range(0,len(urls)):
+#    urllib.request.urlretrieve(urls['url'].iloc[i], my_path + '/team_logos/' + urls['team'].iloc[i] + '.png')
+
+def getImage(my_path): 
+    return OffsetImage(plt.imread(my_path), zoom=.5)
+
+logos = os.listdir(my_path + '/team_logos')
+if '.DS_Store' in logos:
+    logos.remove('.DS_Store')
+
+logo_paths = []
+
+for i in logos:
+    logo_paths.append(my_path + '/team_logos/' + str(i))
+
+#Make a new dataframe that contains average pass play EPA, grouped by team
+pass_epa = NFL2019.loc[NFL2019['pass']==1].groupby(by='posteam')[['epa']].mean()
+
+#Do the same for average rush EPA, grouped by team
+rush_epa = NFL2019.loc[NFL2019.rush==1].groupby(by='posteam')[['epa']].mean()
+import matplotlib.pyplot as plt
+
+x = rush_epa.epa
+y = pass_epa.epa
+
+#Create a figure with size 12x12
+fig, ax = plt.subplots(figsize=(12,12))
+
+#Make a scatter plot with success rate data
+ax.scatter(x, y, s=.001)
+
+#Adding logos to the chart
+for x0, y0, my_path in zip(x, y, logo_paths):
+    ab = AnnotationBbox(getImage(my_path), (x0, y0), frameon=False, fontsize=4)
+    ax.add_artist(ab)
+    
+#Add a grid
+ax.grid(zorder=0,alpha=.4)
+ax.set_axisbelow(True)
+    
+#Adding labels and text
+ax.set_xlabel('EPA per Rush', fontsize=14)
+ax.set_ylabel('EPA per Dropback', fontsize=14)
+ax.set_title('Avg. EPA by Team & Play Type - 2018', fontsize=18)
+plt.figtext(.78, .06, 'Data from nflscrapR', fontsize=10)
+
+#Save the figure as a png
+plt.savefig('team_epas.png', dpi=400)
