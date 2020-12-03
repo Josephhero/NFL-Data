@@ -1,0 +1,77 @@
+import pandas as pd
+import numpy as np
+YEAR = 2020
+filePath = 'filepath'
+
+# Choose whether you want the 'raw_play_by_play' or 'cleaned_play_by_play' data 
+file = 'raw_play_by_play_'
+
+# Import data
+data = pd.read_csv(filePath + file + str(YEAR) + '.csv.gz', compression='gzip', low_memory=False)
+
+# These two lines set the scroll options so you can scroll vertically and horizontally.
+pd.set_option('display.max_rows', 100)
+pd.set_option('display.max_columns', 300)
+
+data = data.loc[data.season_type=='REG']
+penalty_data = data.loc[(data.penalty==1)].copy()
+
+# Basically what I want to do here is create a dataframe with total number of penalties for a team, and against a team
+# This would be the pseudo-logic
+# penalties_for = count of penalty_team for each team
+# penalties_against = case when home team does not match penalty_team, then home team, else away_team
+
+penalty_data = penalty_data[['penalty_team', 'home_team', 'away_team', 'epa']]
+penalty_data['penalty_opponent'] = np.where(penalty_data['penalty_team'] != penalty_data['home_team'], penalty_data['home_team'], penalty_data['away_team']) 
+
+
+team_penalty = penalty_data.groupby('penalty_team')[['penalty_team']].count()
+
+oppponent_penalty = penalty_data.groupby('penalty_opponent')[['penalty_opponent']].count()
+
+import os
+import matplotlib.pyplot as plt
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+
+# Add logos to the dataframe
+def getImage(filePath): 
+    return OffsetImage(plt.imread(filePath), zoom=.5)
+
+logos = os.listdir(filePath + 'team_logos')
+if '.DS_Store' in logos:
+    logos.remove('.DS_Store')
+
+logo_paths = []
+
+for i in logos:
+    logo_paths.append(filePath + 'team_logos/' + str(i))
+logo_paths.sort()
+
+
+#Define x (horizontal) and y (vertical) axis
+x = team_penalty.penalty_team
+y = oppponent_penalty.penalty_opponent
+
+#Create a figure with size 12x12
+fig, ax = plt.subplots(figsize=(15,15))
+
+#Make a scatter plot first to get the points to place logos
+ax.scatter(x, y, s=.001)
+
+#Adding logos to the chart
+for x0, y0, path in zip(x, y, logo_paths):
+    ab = AnnotationBbox(getImage(path), (x0, y0), frameon=False, fontsize=4)
+    ax.add_artist(ab)
+    
+#Add a grid
+ax.grid(zorder=0,alpha=.4)
+ax.set_axisbelow(True)
+    
+#Adding labels and text
+ax.set_xlabel('Team Penalties', fontsize=16)
+ax.set_ylabel('Opponent Penalties', fontsize=16)
+ax.set_title('Weeks 1-12 Penalty Counts, 2020', fontsize=20)
+plt.figtext(.81, .07, 'Data: nflfastR', fontsize=12)
+
+#Save the figure as a png
+plt.savefig('Penalty_Counts.png', dpi=400)
