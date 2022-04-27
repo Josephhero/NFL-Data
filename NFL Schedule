@@ -1,0 +1,80 @@
+library(dplyr)
+library(nflfastR)
+library(nflplotR)
+library(nflreadr)
+library(ggthemes)
+library(ggplot2)
+library(stringr)
+library(lubridate)
+library(tidyverse)
+library(grid)
+# dataset -----------------------------------------------------------------
+
+team = "KC"
+season = 2021
+# all times are set as eastern time zone, so set a differential based on that number
+time_zone_diff = -3
+
+sched <- load_schedules(season)
+
+df <- sched %>% 
+  filter((away_team == team | home_team == team) & game_type == "REG")
+  
+df1 <- df %>% 
+  mutate(opponent = ifelse(home_team==team, df$away_team, home_team)) %>% 
+  mutate(hour = substr(gametime, 1, 2)) %>%
+  mutate(minute = substr(gametime, 4, 6)) %>% 
+  mutate(gameday = parse_date_time(gameday, "ymd")) %>% 
+  mutate(gamedate = format(gameday, format="%a, %b %d")) %>% 
+  mutate(location = ifelse(home_team==team, "", "@")) %>%
+  select(season, week, gameday, gamedate, weekday, gametime, hour, minute, opponent, location)
+
+df1[,7] <- lapply(df1[,7], as.numeric)
+
+df2 <- df1 %>% 
+  mutate(my_hour = hour + time_zone_diff) %>% 
+  mutate(am_pm = ifelse(my_hour >11, "PM", "AM")) %>% 
+  mutate(new_hour = ifelse(my_hour > 12, my_hour - 12, my_hour)) %>% 
+  mutate(game_time = paste(new_hour, ":", minute, " ", am_pm, sep = "")) %>% 
+  select(week, gamedate, game_time, opponent, location)
+
+bye = setdiff(1:17, df2$week)
+
+df3 <- df2%>%
+  add_row(week=bye, opponent=team) %>% 
+  arrange(week)
+
+df4 <- df3 %>% 
+  mutate(xmin = ifelse(week > 9, 18, 1)) %>% 
+  mutate(xmax = ifelse(week > 9, 33, 16)) %>% 
+  mutate(ymin = ifelse(week > 9, (week - 9) * 5, week * 5) -1) %>% 
+  mutate(ymax = ymin + 4) %>% 
+  select(week, gamedate, game_time, opponent, location, xmin, xmax, ymin, ymax)
+
+teams <- df4 %>%
+  left_join(teams_colors_logos, by = c('opponent' = 'team_abbr'))
+
+my_team_df <- teams %>% 
+  filter(opponent == team) 
+
+my_color = my_team_df$team_color[1]
+my_color2 = my_team_df$team_color2[1]
+my_team_nick = my_team_df$team_nick[1]
+
+grad = colorRampPalette(c("gray10", my_color, "gray10"))(50)
+x_center = max(df4$xmax/2)
+y_center = max(df4$ymax/2)
+ggplot() + 
+  annotation_custom(rasterGrob(t(grad), width=unit(1, "npc"), height=unit(1, "npc"))) + 
+  annotate("label", x = 17, y = 1.5, label = paste(my_team_nick, "Schedule", season), color = my_color2, fill = my_color, size = 8, fontface = "bold", label.size = 1) + 
+  geom_nfl_logos(data=my_team_df, aes(x=x_center+1, y=y_center+2, team_abbr=opponent, alpha = 0.9), width=0.8) +
+  geom_rect(data=teams, mapping=aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, fill = fct_inorder(opponent)), color="black") +
+  scale_fill_nfl(type = "primary") +
+  scale_y_reverse() +
+  geom_nfl_logos(data=teams, aes(x = (xmax - 2), y = (ymin + 2), team_abbr = opponent), width = 0.095) + 
+  geom_text(data=teams, aes(x = (xmin + 1), y = (ymin + 1.1), label = gamedate, color = opponent, hjust = "left", fontface = "bold"), size = 4.5) +
+  geom_text(data=teams, aes(x = (xmin + 1), y = (ymax - 1.1), label = game_time, color = opponent, hjust = "left", fontface = "bold"), size = 4.5) +
+  geom_text(data=teams, aes(x = (xmin + 10.5), y = (ymin + 1.9), label = location, color = opponent, fontface = "bold"), size = 4.5) +
+  geom_text(data=my_team_df, aes(x = (xmin + 6.5), y = (ymin + 2), label = "Bye Week", color = opponent, fontface = "bold"), size = 5) +
+  scale_color_nfl(type = "secondary") + 
+  theme_void()
