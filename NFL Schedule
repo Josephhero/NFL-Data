@@ -1,19 +1,10 @@
-library(dplyr)
-library(nflfastR)
-library(nflplotR)
-library(nflreadr)
-library(ggthemes)
-library(ggplot2)
-library(stringr)
-library(lubridate)
-library(tidyverse)
-library(grid)
-# dataset -----------------------------------------------------------------
+image_path = "/Users/Firefly/Desktop/_iMac_Drive/Joseph/Coding/NFL/RStudio/Images"
 
-team = "KC"
+team = "LA"
 season = 2021
 # all times are set as eastern time zone, so set a differential based on that number
 time_zone_diff = -3
+time_zone_name = "PDT"
 
 sched <- load_schedules(season)
 
@@ -64,17 +55,27 @@ my_team_nick = my_team_df$team_nick[1]
 grad = colorRampPalette(c("gray10", my_color, "gray10"))(50)
 x_center = max(df4$xmax/2)
 y_center = max(df4$ymax/2)
-ggplot() + 
+team_schedule <- ggplot() + 
   annotation_custom(rasterGrob(t(grad), width=unit(1, "npc"), height=unit(1, "npc"))) + 
   annotate("label", x = 17, y = 1.5, label = paste(my_team_nick, "Schedule", season), color = my_color2, fill = my_color, size = 8, fontface = "bold", label.size = 1) + 
   geom_nfl_logos(data=my_team_df, aes(x=x_center+1, y=y_center+2, team_abbr=opponent, alpha = 0.9), width=0.8) +
   geom_rect(data=teams, mapping=aes(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, fill = fct_inorder(opponent)), color="black") +
-  scale_fill_nfl(type = "primary") +
+  scale_fill_nfl(type = "primary", guide = "none") +
   scale_y_reverse() +
   geom_nfl_logos(data=teams, aes(x = (xmax - 2), y = (ymin + 2), team_abbr = opponent), width = 0.095) + 
-  geom_text(data=teams, aes(x = (xmin + 1), y = (ymin + 1.1), label = gamedate, color = opponent, hjust = "left", fontface = "bold"), size = 4.5) +
+  geom_text(data=teams, aes(x = (xmin + 1), y = (ymin + 1.5), label = gamedate, color = opponent, hjust = "left", fontface = "bold"), size = 4.5) +
   geom_text(data=teams, aes(x = (xmin + 1), y = (ymax - 1.1), label = game_time, color = opponent, hjust = "left", fontface = "bold"), size = 4.5) +
   geom_text(data=teams, aes(x = (xmin + 10.5), y = (ymin + 1.9), label = location, color = opponent, fontface = "bold"), size = 4.5) +
   geom_text(data=my_team_df, aes(x = (xmin + 6.5), y = (ymin + 2), label = "Bye Week", color = opponent, fontface = "bold"), size = 5) +
-  scale_color_nfl(type = "secondary") + 
+  scale_color_nfl(type = "secondary", guide = "none") + 
+  ggnewscale::new_scale_color() + 
+  ggnewscale::new_scale_fill() + 
+  geom_label(data=teams, aes(x = (xmin + 7.5), y = (ymin + 0.15), label = paste("Week", week), color = opponent, fill = opponent, fontface = "bold"), size = 3) + 
+  scale_color_nfl(type = "primary") +
+  scale_fill_nfl(type = "secondary") + 
+  annotate(geom = "label", label = "Data: @nflfastR | Chart: @josephjefe", x = Inf, y = Inf, hjust = "right", vjust = "bottom", fill = "black", color = "white") + 
+  annotate(geom = "label", label = paste("Time Zone: ", time_zone_name), x = -Inf, y = Inf, hjust = "left", vjust = "bottom", fill = "black", color = "white") + 
   theme_void()
+
+ggsave(paste(my_team_nick, " Schedule ", season, ".png", sep = ""), team_schedule, path = image_path)
+
